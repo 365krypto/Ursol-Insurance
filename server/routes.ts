@@ -53,7 +53,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ursolBalance: newBalance.toFixed(2)
     });
 
-    res.json(updated);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
   });
 
   // Get user policies
