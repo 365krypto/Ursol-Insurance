@@ -1,0 +1,79 @@
+Prompt for AI-powered prototype builder:
+
+Project: URSOL Life Insurance on Blockchain (DeFi + NFT)
+
+Objective: Build a blockchain-based life insurance platform that mimics traditional life insurance but leverages DeFi mechanisms. Users can purchase tiered NFT policy certificates, stake tokens, borrow against policies, and receive parametric payouts in URSOL.
+
+Key Features & Requirements:
+
+NFT Policy Certificates:
+
+Tiered NFT system: Basic, Premium, Premium+Urn
+
+Each NFT represents a life insurance policy; higher tiers unlock features (living urn NFT, family/will info, history tracking)
+
+Sensitive beneficiary/will info stored off-chain, with user-controlled updates
+
+Burn mechanism: Each time an NFT is minted or policy purchased, a percentage of URSOL tokens are burned
+
+Staking & Borrowing:
+
+Users choose staking mode:
+
+Insurance Pool Staking: tokens locked to back policy risk; earns yield
+
+Rewards Staking: tokens staked for discounts, loyalty rewards, governance
+
+Borrowing: NFT policy serves as collateral; default triggers liquidation/revocation of policy
+
+Parametric Underwriting & Claims:
+
+Death triggers verified on-chain via World ID + oracle feed, optional hybrid fallback (community verification)
+
+Claim payouts can be lump sum or installments, in URSOL
+
+Only verified users can trigger claims; base NFT purchase open without verification
+
+Premiums & Payouts:
+
+Hybrid pricing: base flat-tier per NFT, adjusted by staking and optional age bands
+
+Flexible payout selection at claim time
+
+Beneficiaries & Will Structure:
+
+Info stored off-chain (encrypted) with ability to update
+
+Option for users to select which info is on-chain
+
+Interface / User Flows:
+
+Browse/purchase NFT policy tiers
+
+Stake tokens (select mode)
+
+Borrow against NFT policy
+
+View/update beneficiary/will info
+
+Claim processing / payout selection
+
+Dashboard: staked tokens, rewards earned, NFT portfolio
+
+Token:
+
+Native token: URSOL (0x0748e0Ea581Fc3e9A97A68a3FC6F18Fc78743f9a)
+
+Burn mechanism tied to NFT minting and policy activation
+
+Optional:
+
+Governance module for staking rewards and DAO decisions
+
+Integration with identity oracle (World ID) for verification
+
+Goal for Prototype:
+
+Functional front-end demonstrating NFT purchase, staking selection, borrowing, beneficiary management, parametric claims, and dashboard metrics.
+
+Smart contract simulation of staking, borrowing, burning, and NFT minting.
