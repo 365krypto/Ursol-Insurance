@@ -1,6 +1,15 @@
 // MiniKit integration for URSOL Insurance Platform
 import { MiniKit, VerifyCommandInput, VerificationLevel, ISuccessResult } from '@worldcoin/minikit-js';
 
+type MiniAppVerifyActionSuccessPayload = {
+  status: 'success'
+  proof: string
+  merkle_root: string
+  nullifier_hash: string
+  verification_level: VerificationLevel
+  version: number
+}
+
 // MiniKit configuration
 const MINIKIT_CONFIG = {
   appId: "app_staging_ursol_minikit", // Replace with your actual app ID
