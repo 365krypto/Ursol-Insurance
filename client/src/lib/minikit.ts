@@ -1,6 +1,12 @@
 // MiniKit integration for URSOL Insurance Platform
 import { MiniKit } from '@worldcoin/minikit-js';
 
+export type VerifyCommandInput = {
+  action: string
+  signal?: string
+  verification_level?: "orb" | "device" // Default: Orb
+}
+
 // MiniKit configuration
 const MINIKIT_CONFIG = {
   appId: "app_staging_ursol_minikit", // Replace with your actual app ID
@@ -29,12 +35,14 @@ export class URSOLMiniKit {
     }
 
     try {
-      // Use async verification method
-      const { finalPayload } = await (MiniKit as any).verifyAsync({
+      // Use async verification method with proper typing
+      const verifyInput: VerifyCommandInput = {
         action: action, // e.g., "verify-claim", "verify-policy-purchase"
         signal: signal || "", // Optional signal for additional verification context
         verification_level: "orb" // Use orb verification for insurance claims
-      });
+      };
+      
+      const { finalPayload } = await (MiniKit as any).verifyAsync(verifyInput);
 
       if (finalPayload.status === 'error') {
         console.log('Error payload', finalPayload);
