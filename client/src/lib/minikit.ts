@@ -1,5 +1,5 @@
 // MiniKit integration for URSOL Insurance Platform
-import { MiniKit, VerifyCommandInput, VerificationLevel, ISuccessResult } from '@worldcoin/minikit-js';
+import { MiniKit, VerifyCommandInput, VerificationLevel, ISuccessResult, PayCommandInput, TokensPayload, Tokens, Network } from '@worldcoin/minikit-js';
 
 type MiniAppVerifyActionSuccessPayload = {
   status: 'success'
@@ -88,25 +88,27 @@ export class URSOLMiniKit {
   // Payment for premiums and claims
   async initiatePayment(
     amount: string, 
-    currency: string = "USDCE", 
-    description: string = "URSOL Insurance Payment"
+    token: Tokens = Tokens.USDC, 
+    description: string = "URSOL Insurance Payment",
+    reference?: string
   ): Promise<any> {
     if (!this.isInstalled()) {
       throw new Error("World App not installed. Please install World App to use this feature.");
     }
 
-    const payload = {
+    const payCommandInput: PayCommandInput = {
+      reference: reference || `ursol-payment-${Date.now()}`,
       to: "0x742d35cc6639c0532fda7df8e0fd7b30a9b7a34c", // URSOL treasury address
       tokens: [{
-        symbol: currency,
-        token_amount: parseFloat(amount).toString(),
+        symbol: token,
+        token_amount: amount,
       }],
+      // network: Network.Ethereum, // Optional, commenting out until we know available values
       description: description,
-      reference: `ursol-payment-${Date.now()}`,
     };
 
     try {
-      const result = await MiniKit.commands.pay(payload as any);
+      const result = await MiniKit.commands.pay(payCommandInput);
       return result;
     } catch (error) {
       console.error("Payment failed:", error);
