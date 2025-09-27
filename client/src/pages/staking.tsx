@@ -8,8 +8,25 @@ export default function Staking() {
     queryKey: ["/api/staking"],
   });
 
-  const insurancePool = stakingPositions?.find(s => s.type === "insurance_pool");
-  const rewardsPool = stakingPositions?.find(s => s.type === "rewards");
+  // Aggregate staking positions by type
+  const insurancePositions = stakingPositions?.filter(s => s.type === "insurance_pool") || [];
+  const rewardsPositions = stakingPositions?.filter(s => s.type === "rewards") || [];
+  
+  const insurancePool = insurancePositions.length > 0 ? {
+    id: insurancePositions[0].id, // Use first position ID for operations
+    amount: insurancePositions.reduce((sum, pos) => sum + parseFloat(pos.amount), 0).toString(),
+    apy: insurancePositions[0].apy, // APY should be same across positions
+    pendingRewards: insurancePositions.reduce((sum, pos) => sum + parseFloat(pos.pendingRewards || "0"), 0).toString(),
+    lockPeriod: insurancePositions[0].lockPeriod,
+  } : undefined;
+  
+  const rewardsPool = rewardsPositions.length > 0 ? {
+    id: rewardsPositions[0].id,
+    amount: rewardsPositions.reduce((sum, pos) => sum + parseFloat(pos.amount), 0).toString(),
+    apy: rewardsPositions[0].apy,
+    pendingRewards: rewardsPositions.reduce((sum, pos) => sum + parseFloat(pos.pendingRewards || "0"), 0).toString(),
+    lockPeriod: rewardsPositions[0].lockPeriod,
+  } : undefined;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
