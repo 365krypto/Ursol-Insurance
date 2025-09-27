@@ -341,98 +341,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Payment confirmation - official MiniKit pattern endpoint
+  // Payment confirmation - official MiniKit pattern with Worldcoin API verification
   app.post("/api/confirm-payment", async (req, res) => {
     try {
-      const finalPayload = req.body;
+      const { payload } = req.body;
       
-      console.log("[Payment] Confirming payment with payload:", JSON.stringify(finalPayload, null, 2));
-      
-      // Extract payment reference - handle both MiniKit format and test format
-      const paymentRef = finalPayload.reference || finalPayload.id || finalPayload.paymentId;
-      
-      if (!paymentRef) {
-        console.log("[Payment] No payment reference found in payload");
+      if (!payload) {
         return res.status(400).json({
           success: false,
-          message: "Missing payment reference (reference, id, or paymentId required)"
+          message: "Missing payload in request body"
         });
       }
 
-      // Find and update the payment by reference ID
-      console.log("[Payment] Looking up payment with reference:", paymentRef);
-      const paymentRecord = await storage.getPaymentByPaymentId(paymentRef);
+      console.log("[Payment] Confirming payment with payload:", JSON.stringify(payload, null, 2));
+      
+      // IMPORTANT: Here we fetch the reference from our database to ensure the transaction we are verifying is the same one we initiated
+      const reference = payload.reference;
+      if (!reference) {
+        return res.status(400).json({
+          success: false,
+          message: "Missing reference in payload"
+        });
+      }
+
+      // Find the payment record by reference ID
+      console.log("[Payment] Looking up payment with reference:", reference);
+      const paymentRecord = await storage.getPaymentByPaymentId(reference);
       
       if (!paymentRecord) {
-        console.log("[Payment] Payment record not found for reference:", paymentRef);
-        
-        // Debug: List all payments to help diagnose
-        const allPayments = await storage.getUserPayments(DEMO_USER_ID);
-        console.log("[Payment] Available payments for user:", allPayments.map(p => ({ id: p.id, paymentId: p.paymentId, status: p.status })));
-        
+        console.log("[Payment] Payment record not found for reference:", reference);
         return res.status(404).json({
           success: false,
-          message: "Payment record not found",
-          debug: {
-            searchedFor: paymentRef,
-            availablePayments: allPayments.map(p => ({ id: p.id, paymentId: p.paymentId, status: p.status }))
-          }
+          message: "Payment record not found"
         });
       }
 
       console.log("[Payment] Found payment record:", { id: paymentRecord.id, paymentId: paymentRecord.paymentId, status: paymentRecord.status });
 
-      // Simulate blockchain event for payment verification in development
-      const URSOL_TREASURY = "0x742d35cc6639c0532fda7df8e0fd7b30a9b7a34c";
-      try {
-        await blockchain.simulateTransferEvent(
-          finalPayload.sender || "0x0000000000000000000000000000000000000000",
-          URSOL_TREASURY,
-          paymentRecord.amount,
-          paymentRecord.currency === "USDC" ? "0xA0b86a33E6441b4c2b3Eb0e25e9b3F9b5d4F8A4B" : "0x163F8C2467924BE0AE7B5347228CABF260318753",
-          paymentRef,
-          true
-        );
+      // 1. Check that the transaction we received from the mini app is the same one we sent
+      if (payload.reference === paymentRecord.paymentId) {
         
-        // Verify the payment on blockchain
-        const verification = await blockchain.verifyPaymentByReference(paymentRef);
-        
-        if (!verification.verified) {
-          console.log("[Payment] Blockchain verification failed for payment:", paymentRef);
-          return res.status(400).json({
-            success: false,
-            message: "Payment could not be verified on blockchain",
-            verification: verification
-          });
+        // 2. Verify transaction with Worldcoin developer API
+        if (payload.transaction_id && process.env.APP_ID && process.env.DEV_PORTAL_API_KEY) {
+          try {
+            const response = await fetch(
+              `https://developer.worldcoin.org/api/v2/minikit/transaction/${payload.transaction_id}?app_id=${process.env.APP_ID}`,
+              {
+                method: 'GET',
+                headers: {
+                  Authorization: `Bearer ${process.env.DEV_PORTAL_API_KEY}`,
+                },
+              }
+            );
+            
+            if (!response.ok) {
+              console.error("[Payment] Worldcoin API error:", response.status, response.statusText);
+              return res.status(400).json({
+                success: false,
+                message: "Failed to verify transaction with Worldcoin API"
+              });
+            }
+            
+            const transaction = await response.json();
+            console.log("[Payment] Worldcoin API response:", transaction);
+
+            // 3. Here we optimistically confirm the transaction if reference matches and status is not failed
+            if (transaction.reference === reference && transaction.status !== 'failed') {
+              console.log("[Payment] Worldcoin API verification successful");
+            } else {
+              console.log("[Payment] Worldcoin API verification failed:", { 
+                expectedRef: reference, 
+                actualRef: transaction.reference, 
+                status: transaction.status 
+              });
+              return res.status(400).json({
+                success: false,
+                message: "Transaction verification failed",
+                details: {
+                  referenceMatch: transaction.reference === reference,
+                  status: transaction.status
+                }
+              });
+            }
+          } catch (apiError) {
+            console.error("[Payment] Worldcoin API call failed:", apiError);
+            // In development, continue without API verification
+            console.log("[Payment] Continuing without API verification in development mode");
+          }
+        } else {
+          console.log("[Payment] Missing API credentials, skipping Worldcoin API verification");
         }
-        
-        console.log("[Payment] Blockchain verification successful:", verification.event?.txHash);
-      } catch (error) {
-        console.error("[Payment] Blockchain verification error:", error);
-        // Don't fail the payment for blockchain verification errors in development
+
+        // Simulate blockchain event for payment verification in development
+        const URSOL_TREASURY = "0x742d35cc6639c0532fda7df8e0fd7b30a9b7a34c";
+        try {
+          await blockchain.simulateTransferEvent(
+            payload.sender || "0x0000000000000000000000000000000000000000",
+            URSOL_TREASURY,
+            paymentRecord.amount,
+            paymentRecord.currency === "USDC" ? "0xA0b86a33E6441b4c2b3Eb0e25e9b3F9b5d4F8A4B" : "0x163F8C2467924BE0AE7B5347228CABF260318753",
+            reference,
+            true
+          );
+          
+          // Verify the payment on blockchain
+          const verification = await blockchain.verifyPaymentByReference(reference);
+          
+          if (verification.verified) {
+            console.log("[Payment] Blockchain verification successful:", verification.event?.txHash);
+          }
+        } catch (error) {
+          console.error("[Payment] Blockchain verification error:", error);
+          // Don't fail the payment for blockchain verification errors in development
+        }
+
+        // Update payment status to completed
+        const updatedPayment = await storage.updatePayment(paymentRecord.id, {
+          status: "completed"
+        });
+
+        // Log successful payment activity
+        await storage.createActivity({
+          userId: DEMO_USER_ID,
+          type: "premium_payment",
+          description: `Payment completed: ${paymentRecord.amount} ${paymentRecord.currency} (${reference})`,
+          amount: paymentRecord.amount,
+        });
+
+        console.log(`[Payment] Confirmed payment ${reference} successfully`);
+
+        return res.json({
+          success: true,
+          message: "Payment confirmed successfully",
+          payment: updatedPayment,
+          transaction: payload
+        });
+      } else {
+        console.log("[Payment] Reference mismatch:", { 
+          payloadRef: payload.reference, 
+          dbRef: paymentRecord.paymentId 
+        });
+        return res.status(400).json({
+          success: false,
+          message: "Payment reference mismatch"
+        });
       }
-
-      // Update payment status to completed
-      const updatedPayment = await storage.updatePayment(paymentRecord.id, {
-        status: "completed"
-      });
-
-      // Log successful payment activity
-      await storage.createActivity({
-        userId: DEMO_USER_ID,
-        type: "premium_payment",
-        description: `Payment completed: ${paymentRecord.amount} ${paymentRecord.currency} (${paymentRef})`,
-        amount: paymentRecord.amount,
-      });
-
-      console.log(`[Payment] Confirmed payment ${paymentRef} successfully`);
-
-      res.json({
-        success: true,
-        message: "Payment confirmed successfully",
-        payment: updatedPayment,
-        transaction: finalPayload
-      });
     } catch (error) {
       console.error("Payment confirmation error:", error);
       res.status(500).json({

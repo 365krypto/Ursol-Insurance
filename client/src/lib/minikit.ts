@@ -128,7 +128,7 @@ export class URSOLMiniKit {
         const confirmRes = await fetch('/api/confirm-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(finalPayload),
+          body: JSON.stringify({ payload: finalPayload }),
         });
         const payment = await confirmRes.json();
         
