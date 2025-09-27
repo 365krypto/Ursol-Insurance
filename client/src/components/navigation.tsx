@@ -1,16 +1,51 @@
 import { Link, useLocation } from "wouter";
-import { Shield, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { Shield, Menu, X, Wallet, Check } from "lucide-react";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { minikit } from "@/lib/minikit";
 
 export function Navigation() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
 
+  const queryClient = useQueryClient();
   const { data: user } = useQuery({
     queryKey: ["/api/user"],
   });
+
+  const handleWalletConnect = useCallback(async () => {
+    if (!minikit.isInstalled()) {
+      alert("World App not installed. Please install World App to connect your wallet.");
+      return;
+    }
+
+    if (isConnecting) return;
+
+    setIsConnecting(true);
+    try {
+      // Authenticate wallet using World ID
+      const result = await minikit.authenticateWallet("Connect to URSOL Insurance Platform");
+      
+      if (result?.success) {
+        console.log("Wallet connected successfully:", result);
+        setIsConnected(true);
+        
+        // Refresh user data after connection
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+        
+        // Send haptic feedback for success
+        await minikit.sendHapticFeedback("light");
+      }
+    } catch (error) {
+      console.error("Wallet connection failed:", error);
+      alert("Failed to connect wallet. Please try again.");
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [isConnecting, queryClient]);
 
   const navItems = [
     { href: "/", label: "Dashboard" },
@@ -58,8 +93,29 @@ export function Navigation() {
               </span>
             </div>
             
-            <Button className="hidden sm:flex" data-testid="button-connect-wallet">
-              Connect Wallet
+            <Button 
+              className="hidden sm:flex" 
+              onClick={handleWalletConnect}
+              disabled={isConnecting}
+              variant={isConnected ? "secondary" : "default"}
+              data-testid="button-connect-wallet"
+            >
+              {isConnecting ? (
+                <>
+                  <Wallet className="w-4 h-4 mr-2 animate-spin" />
+                  Connecting...
+                </>
+              ) : isConnected ? (
+                <>
+                  <Check className="w-4 h-4 mr-2" />
+                  Connected
+                </>
+              ) : (
+                <>
+                  <Wallet className="w-4 h-4 mr-2" />
+                  Connect Wallet
+                </>
+              )}
             </Button>
 
             <Button
