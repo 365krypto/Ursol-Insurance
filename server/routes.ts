@@ -268,15 +268,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // World ID proof verification
   app.post("/api/verify", async (req, res) => {
     try {
-      const { proof, merkle_root, nullifier_hash, verification_level, action, signal } = req.body;
+      const { payload, action, signal } = req.body;
 
-      // In a real implementation, you would verify the proof against World ID's API
-      // For now, we'll simulate verification
-      const isValidProof = proof && merkle_root && nullifier_hash;
-      
-      if (!isValidProof) {
+      // Validate the payload structure
+      if (!payload || !payload.proof || !payload.merkle_root || !payload.nullifier_hash) {
         return res.status(400).json({
-          verified: false,
+          status: 400,
           message: "Invalid proof data"
         });
       }
@@ -285,12 +282,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // const verificationResult = await fetch('https://developer.worldcoin.org/api/v1/verify/app_staging_ursol_minikit', {
       //   method: 'POST',
       //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ proof, merkle_root, nullifier_hash, verification_level, action, signal })
+      //   body: JSON.stringify({
+      //     proof: payload.proof,
+      //     merkle_root: payload.merkle_root,
+      //     nullifier_hash: payload.nullifier_hash,
+      //     verification_level: payload.verification_level,
+      //     action: action,
+      //     signal: signal
+      //   })
       // });
 
       // Simulate successful verification for development
       console.log(`[World ID] Verifying action: ${action}, signal: ${signal}`);
       console.log(`[World ID] Proof verification simulated as successful`);
+      console.log(`[World ID] Nullifier hash: ${payload.nullifier_hash}`);
 
       // Log verification activity
       await storage.createActivity({
@@ -301,15 +306,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({
-        verified: true,
+        status: 200,
         message: "World ID verification successful",
         action: action,
-        nullifier_hash: nullifier_hash
+        nullifier_hash: payload.nullifier_hash
       });
     } catch (error) {
       console.error("World ID verification error:", error);
       res.status(500).json({
-        verified: false,
+        status: 500,
         message: "Verification service error"
       });
     }

@@ -1,25 +1,5 @@
 // MiniKit integration for URSOL Insurance Platform
-import { MiniKit } from '@worldcoin/minikit-js';
-
-export type VerifyCommandInput = {
-  action: string
-  signal?: string
-  verification_level?: "orb" | "device" // Default: Orb
-}
-
-type MiniAppVerifyActionSuccessPayload = {
-  status: 'success'
-  proof: string
-  merkle_root: string
-  nullifier_hash: string
-  verification_level: "orb" | "device"
-  version: number
-}
-
-type MiniAppVerifyActionErrorPayload = {
-  status: 'error'
-  error_code: string
-}
+import { MiniKit, VerifyCommandInput, VerificationLevel, ISuccessResult } from '@worldcoin/minikit-js';
 
 // MiniKit configuration
 const MINIKIT_CONFIG = {
@@ -43,20 +23,21 @@ export class URSOLMiniKit {
   }
 
   // World ID Verification for Claims Processing
-  async verifyWorldID(action: string, signal?: string): Promise<MiniAppVerifyActionSuccessPayload & { backendVerified: boolean }> {
+  async verifyWorldID(action: string, signal?: string): Promise<ISuccessResult & { backendVerified: boolean }> {
     if (!this.isInstalled()) {
       throw new Error("World App not installed. Please install World App to use this feature.");
     }
 
     try {
-      // Use async verification method with proper typing
-      const verifyInput: VerifyCommandInput = {
+      // Use official MiniKit API with proper typing
+      const verifyPayload: VerifyCommandInput = {
         action: action, // e.g., "verify-claim", "verify-policy-purchase"
         signal: signal || "", // Optional signal for additional verification context
-        verification_level: "orb" // Use orb verification for insurance claims
+        verification_level: VerificationLevel.Orb // Use orb verification for insurance claims
       };
       
-      const { finalPayload }: { finalPayload: MiniAppVerifyActionSuccessPayload | MiniAppVerifyActionErrorPayload } = await (MiniKit as any).verifyAsync(verifyInput);
+      // World App will open a drawer prompting the user to confirm the operation
+      const { finalPayload } = await MiniKit.commandsAsync.verify(verifyPayload);
 
       if (finalPayload.status === 'error') {
         console.log('Error payload', finalPayload);
@@ -70,27 +51,23 @@ export class URSOLMiniKit {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          proof: finalPayload.proof,
-          merkle_root: finalPayload.merkle_root,
-          nullifier_hash: finalPayload.nullifier_hash,
-          verification_level: finalPayload.verification_level,
+          payload: finalPayload as ISuccessResult, // Parses only the fields we need to verify
           action: action,
-          signal: signal || ""
+          signal: signal || "", // Optional
         }),
       });
 
-      const verificationResult = await verifyResponse.json();
+      const verifyResponseJson = await verifyResponse.json();
       
-      if (!verifyResponse.ok) {
-        throw new Error(`Backend verification failed: ${verificationResult.message}`);
+      if (verifyResponseJson.status !== 200) {
+        throw new Error(`Backend verification failed: ${verifyResponseJson.message}`);
       }
 
-      // finalPayload is guaranteed to be success here due to error check above
-      const successPayload = finalPayload as MiniAppVerifyActionSuccessPayload;
+      console.log('Verification success!');
       
       return {
-        ...successPayload,
-        backendVerified: verificationResult.verified
+        ...(finalPayload as ISuccessResult),
+        backendVerified: true
       };
     } catch (error) {
       console.error("World ID verification failed:", error);
