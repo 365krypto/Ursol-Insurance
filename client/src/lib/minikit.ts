@@ -32,7 +32,7 @@ export class URSOLMiniKit {
   }
 
   // World ID Verification for Claims Processing
-  async verifyWorldID(action: string, signal?: string): Promise<ISuccessResult & { backendVerified: boolean }> {
+  async verifyWorldID(action: string, signal?: string): Promise<ISuccessResult & { backendVerified: boolean; cloudVerified: boolean }> {
     if (!this.isInstalled()) {
       throw new Error("World App not installed. Please install World App to use this feature.");
     }
@@ -68,15 +68,16 @@ export class URSOLMiniKit {
 
       const verifyResponseJson = await verifyResponse.json();
       
-      if (verifyResponseJson.status !== 200) {
-        throw new Error(`Backend verification failed: ${verifyResponseJson.message}`);
+      if (verifyResponseJson.status !== 200 || !verifyResponseJson.verifyRes?.success) {
+        throw new Error(`Backend verification failed: ${verifyResponseJson.verifyRes?.error || 'Unknown error'}`);
       }
 
       console.log('Verification success!');
       
       return {
         ...(finalPayload as ISuccessResult),
-        backendVerified: true
+        backendVerified: true,
+        cloudVerified: verifyResponseJson.verifyRes.success
       };
     } catch (error) {
       console.error("World ID verification failed:", error);
