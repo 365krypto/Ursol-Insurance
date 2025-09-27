@@ -7,6 +7,20 @@ export type VerifyCommandInput = {
   verification_level?: "orb" | "device" // Default: Orb
 }
 
+type MiniAppVerifyActionSuccessPayload = {
+  status: 'success'
+  proof: string
+  merkle_root: string
+  nullifier_hash: string
+  verification_level: "orb" | "device"
+  version: number
+}
+
+type MiniAppVerifyActionErrorPayload = {
+  status: 'error'
+  error_code: string
+}
+
 // MiniKit configuration
 const MINIKIT_CONFIG = {
   appId: "app_staging_ursol_minikit", // Replace with your actual app ID
@@ -29,7 +43,7 @@ export class URSOLMiniKit {
   }
 
   // World ID Verification for Claims Processing
-  async verifyWorldID(action: string, signal?: string): Promise<any> {
+  async verifyWorldID(action: string, signal?: string): Promise<MiniAppVerifyActionSuccessPayload & { backendVerified: boolean }> {
     if (!this.isInstalled()) {
       throw new Error("World App not installed. Please install World App to use this feature.");
     }
@@ -42,7 +56,7 @@ export class URSOLMiniKit {
         verification_level: "orb" // Use orb verification for insurance claims
       };
       
-      const { finalPayload } = await (MiniKit as any).verifyAsync(verifyInput);
+      const { finalPayload }: { finalPayload: MiniAppVerifyActionSuccessPayload | MiniAppVerifyActionErrorPayload } = await (MiniKit as any).verifyAsync(verifyInput);
 
       if (finalPayload.status === 'error') {
         console.log('Error payload', finalPayload);
@@ -71,8 +85,11 @@ export class URSOLMiniKit {
         throw new Error(`Backend verification failed: ${verificationResult.message}`);
       }
 
+      // finalPayload is guaranteed to be success here due to error check above
+      const successPayload = finalPayload as MiniAppVerifyActionSuccessPayload;
+      
       return {
-        ...finalPayload,
+        ...successPayload,
         backendVerified: verificationResult.verified
       };
     } catch (error) {
