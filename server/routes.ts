@@ -265,6 +265,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(activities);
   });
 
+  // World ID proof verification
+  app.post("/api/verify", async (req, res) => {
+    try {
+      const { proof, merkle_root, nullifier_hash, verification_level, action, signal } = req.body;
+
+      // In a real implementation, you would verify the proof against World ID's API
+      // For now, we'll simulate verification
+      const isValidProof = proof && merkle_root && nullifier_hash;
+      
+      if (!isValidProof) {
+        return res.status(400).json({
+          verified: false,
+          message: "Invalid proof data"
+        });
+      }
+
+      // TODO: Replace with actual World ID API verification
+      // const verificationResult = await fetch('https://developer.worldcoin.org/api/v1/verify/app_staging_ursol_minikit', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ proof, merkle_root, nullifier_hash, verification_level, action, signal })
+      // });
+
+      // Simulate successful verification for development
+      console.log(`[World ID] Verifying action: ${action}, signal: ${signal}`);
+      console.log(`[World ID] Proof verification simulated as successful`);
+
+      // Log verification activity
+      await storage.createActivity({
+        userId: DEMO_USER_ID,
+        type: "verification",
+        description: `World ID verification completed for action: ${action}`,
+        amount: "0",
+      });
+
+      res.json({
+        verified: true,
+        message: "World ID verification successful",
+        action: action,
+        nullifier_hash: nullifier_hash
+      });
+    } catch (error) {
+      console.error("World ID verification error:", error);
+      res.status(500).json({
+        verified: false,
+        message: "Verification service error"
+      });
+    }
+  });
+
   // Get dashboard stats
   app.get("/api/dashboard", async (req, res) => {
     const [policies, stakingPositions, loans, activities] = await Promise.all([

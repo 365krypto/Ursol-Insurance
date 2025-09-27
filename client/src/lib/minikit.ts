@@ -28,14 +28,45 @@ export class URSOLMiniKit {
       throw new Error("World App not installed. Please install World App to use this feature.");
     }
 
-    const payload = {
-      action: action, // e.g., "verify-claim", "verify-policy-purchase"
-      signal: signal || "", // Optional signal for additional verification context
-    };
-
     try {
-      const result = await MiniKit.commands.verify(payload);
-      return result;
+      // Use async verification method
+      const { finalPayload } = await (MiniKit as any).verifyAsync({
+        action: action, // e.g., "verify-claim", "verify-policy-purchase"
+        signal: signal || "", // Optional signal for additional verification context
+        verification_level: "orb" // Use orb verification for insurance claims
+      });
+
+      if (finalPayload.status === 'error') {
+        console.log('Error payload', finalPayload);
+        throw new Error(`World ID verification failed: ${finalPayload.error_code}`);
+      }
+
+      // Verify the proof in the backend
+      const verifyResponse = await fetch('/api/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          proof: finalPayload.proof,
+          merkle_root: finalPayload.merkle_root,
+          nullifier_hash: finalPayload.nullifier_hash,
+          verification_level: finalPayload.verification_level,
+          action: action,
+          signal: signal || ""
+        }),
+      });
+
+      const verificationResult = await verifyResponse.json();
+      
+      if (!verifyResponse.ok) {
+        throw new Error(`Backend verification failed: ${verificationResult.message}`);
+      }
+
+      return {
+        ...finalPayload,
+        backendVerified: verificationResult.verified
+      };
     } catch (error) {
       console.error("World ID verification failed:", error);
       throw error;
