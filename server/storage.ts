@@ -5,7 +5,8 @@ import {
   type Loan, type InsertLoan,
   type Beneficiary, type InsertBeneficiary,
   type Claim, type InsertClaim,
-  type Activity, type InsertActivity
+  type Activity, type InsertActivity,
+  type Payment, type InsertPayment
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -44,6 +45,12 @@ export interface IStorage {
   // Activities
   getUserActivities(userId: string): Promise<Activity[]>;
   createActivity(activity: InsertActivity): Promise<Activity>;
+
+  // Payments
+  getUserPayments(userId: string): Promise<Payment[]>;
+  getPaymentByPaymentId(paymentId: string): Promise<Payment | undefined>;
+  createPayment(payment: InsertPayment): Promise<Payment>;
+  updatePayment(id: string, updates: Partial<Payment>): Promise<Payment>;
 }
 
 export class MemStorage implements IStorage {
@@ -54,6 +61,7 @@ export class MemStorage implements IStorage {
   private beneficiaries: Map<string, Beneficiary> = new Map();
   private claims: Map<string, Claim> = new Map();
   private activities: Map<string, Activity> = new Map();
+  private payments: Map<string, Payment> = new Map();
 
   constructor() {
     this.seedData();
@@ -351,6 +359,45 @@ export class MemStorage implements IStorage {
     };
     this.activities.set(id, activity);
     return activity;
+  }
+
+  async getUserPayments(userId: string): Promise<Payment[]> {
+    return Array.from(this.payments.values())
+      .filter(p => p.userId === userId)
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+  }
+
+  async getPaymentByPaymentId(paymentId: string): Promise<Payment | undefined> {
+    return Array.from(this.payments.values()).find(p => p.paymentId === paymentId);
+  }
+
+  async createPayment(insertPayment: InsertPayment): Promise<Payment> {
+    const id = randomUUID();
+    const payment: Payment = { 
+      ...insertPayment, 
+      id,
+      currency: insertPayment.currency || "USDCE",
+      status: insertPayment.status || "pending",
+      relatedEntityId: insertPayment.relatedEntityId || null,
+      relatedEntityType: insertPayment.relatedEntityType || null,
+      createdAt: new Date(),
+      completedAt: null
+    };
+    this.payments.set(id, payment);
+    return payment;
+  }
+
+  async updatePayment(id: string, updates: Partial<Payment>): Promise<Payment> {
+    const payment = this.payments.get(id);
+    if (!payment) throw new Error("Payment not found");
+    
+    const updated = { 
+      ...payment, 
+      ...updates,
+      completedAt: updates.status === 'completed' ? new Date() : payment.completedAt
+    };
+    this.payments.set(id, updated);
+    return updated;
   }
 }
 

@@ -76,6 +76,20 @@ export const activities = pgTable("activities", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const payments = pgTable("payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  paymentId: text("payment_id").notNull().unique(), // Generated UUID for tracking
+  type: text("type").notNull(), // 'premium', 'claim_payout', 'loan_repayment'
+  amount: decimal("amount", { precision: 18, scale: 2 }).notNull(),
+  currency: text("currency").default("USDCE"),
+  status: text("status").default("pending"), // 'pending', 'completed', 'failed', 'cancelled'
+  relatedEntityId: varchar("related_entity_id"), // policy_id, loan_id, claim_id
+  relatedEntityType: text("related_entity_type"), // 'policy', 'loan', 'claim'
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertPolicySchema = createInsertSchema(policies).omit({ id: true, createdAt: true });
@@ -84,6 +98,7 @@ export const insertLoanSchema = createInsertSchema(loans).omit({ id: true, creat
 export const insertBeneficiarySchema = createInsertSchema(beneficiaries).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertClaimSchema = createInsertSchema(claims).omit({ id: true, submittedAt: true });
 export const insertActivitySchema = createInsertSchema(activities).omit({ id: true, createdAt: true });
+export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true, completedAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -100,3 +115,5 @@ export type Claim = typeof claims.$inferSelect;
 export type InsertClaim = z.infer<typeof insertClaimSchema>;
 export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
+export type Payment = typeof payments.$inferSelect;
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;

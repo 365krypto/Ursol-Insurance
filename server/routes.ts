@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import crypto from "crypto";
 import { storage } from "./storage";
 import { 
   insertPolicySchema, 
@@ -263,6 +264,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/activities", async (req, res) => {
     const activities = await storage.getUserActivities(DEMO_USER_ID);
     res.json(activities);
+  });
+
+  // Get user payments
+  app.get("/api/payments", async (req, res) => {
+    const payments = await storage.getUserPayments(DEMO_USER_ID);
+    res.json(payments);
+  });
+
+  // Payment initiation - generates UUID and stores in database
+  app.post("/api/payments/initiate", async (req, res) => {
+    try {
+      const { type, amount, currency, relatedEntityId, relatedEntityType } = req.body;
+      
+      // Generate UUID and remove dashes like in your example
+      const paymentId = crypto.randomUUID().replace(/-/g, '');
+      
+      // Store the payment in database for later verification
+      const payment = await storage.createPayment({
+        userId: DEMO_USER_ID,
+        paymentId: paymentId,
+        type: type || "premium",
+        amount: amount || "0",
+        currency: currency || "USDCE",
+        relatedEntityId: relatedEntityId || null,
+        relatedEntityType: relatedEntityType || null,
+        status: "pending"
+      });
+
+      console.log(`[Payment] Initiated payment ${paymentId} for ${amount} ${currency}`);
+
+      // Log payment initiation activity
+      await storage.createActivity({
+        userId: DEMO_USER_ID,
+        type: "premium_payment",
+        description: `Payment initiated: ${amount} ${currency} (${paymentId})`,
+        amount: amount || "0",
+      });
+
+      res.json({ id: paymentId });
+    } catch (error) {
+      console.error("Payment initiation error:", error);
+      res.status(500).json({
+        error: "Payment initiation failed"
+      });
+    }
   });
 
   // World ID proof verification
