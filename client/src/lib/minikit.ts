@@ -1,5 +1,5 @@
 // MiniKit integration for URSOL Insurance Platform
-import { MiniKit, VerifyCommandInput, VerificationLevel, ISuccessResult, PayCommandInput, TokensPayload, Tokens, Network } from '@worldcoin/minikit-js';
+import { MiniKit, VerifyCommandInput, VerificationLevel, ISuccessResult, PayCommandInput, TokensPayload, Tokens, Network, tokenToDecimals } from '@worldcoin/minikit-js';
 
 type MiniAppVerifyActionSuccessPayload = {
   status: 'success'
@@ -85,31 +85,62 @@ export class URSOLMiniKit {
     }
   }
 
-  // Payment for premiums and claims
-  async initiatePayment(
-    amount: string, 
+  // Payment for premiums and claims - follows official MiniKit pattern
+  async sendPayment(
+    amount: number, 
     token: Tokens = Tokens.USDC, 
-    description: string = "URSOL Insurance Payment",
-    reference?: string
+    description: string = "URSOL Insurance Payment"
   ): Promise<any> {
     if (!this.isInstalled()) {
       throw new Error("World App not installed. Please install World App to use this feature.");
     }
 
-    const payCommandInput: PayCommandInput = {
-      reference: reference || `ursol-payment-${Date.now()}`,
-      to: "0x742d35cc6639c0532fda7df8e0fd7b30a9b7a34c", // URSOL treasury address
-      tokens: [{
-        symbol: token,
-        token_amount: amount,
-      }],
-      // network: Network.Ethereum, // Optional, commenting out until we know available values
-      description: description,
-    };
-
     try {
-      const result = await MiniKit.commands.pay(payCommandInput);
-      return result;
+      // Step 1: Get payment ID from backend
+      const res = await fetch('/api/initiate-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: "premium",
+          amount: amount.toString(),
+          currency: token,
+          description: description
+        })
+      });
+      const { id } = await res.json();
+
+      // Step 2: Create payment payload with proper decimals
+      const payload: PayCommandInput = {
+        reference: id,
+        to: '0x742d35cc6639c0532fda7df8e0fd7b30a9b7a34c', // URSOL treasury address
+        tokens: [{
+          symbol: token,
+          token_amount: tokenToDecimals(amount, token).toString(),
+        }],
+        description: description,
+      };
+
+      // Step 3: Execute payment through MiniKit
+      const { finalPayload } = await MiniKit.commandsAsync.pay(payload);
+
+      // Step 4: Confirm payment if successful
+      if (finalPayload.status === 'success') {
+        const confirmRes = await fetch('/api/confirm-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(finalPayload),
+        });
+        const payment = await confirmRes.json();
+        
+        if (payment.success) {
+          console.log('Payment successful!', payment);
+          return { success: true, payment: payment };
+        } else {
+          throw new Error('Payment confirmation failed');
+        }
+      } else {
+        throw new Error(`Payment failed: ${finalPayload.error_code}`);
+      }
     } catch (error) {
       console.error("Payment failed:", error);
       throw error;

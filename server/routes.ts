@@ -272,7 +272,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(payments);
   });
 
-  // Payment initiation - generates UUID and stores in database
+  // Payment initiation - official MiniKit pattern endpoint
+  app.post("/api/initiate-payment", async (req, res) => {
+    try {
+      const { type, amount, currency, description } = req.body;
+      
+      // Generate UUID and remove dashes like in MiniKit example
+      const paymentId = crypto.randomUUID().replace(/-/g, '');
+      
+      // Store the payment in database for later verification
+      const payment = await storage.createPayment({
+        userId: DEMO_USER_ID,
+        paymentId: paymentId,
+        type: type || "premium",
+        amount: amount || "0",
+        currency: currency || "USDC",
+        status: "pending"
+      });
+
+      console.log(`[Payment] Initiated payment ${paymentId} for ${amount} ${currency}`);
+
+      res.json({ id: paymentId });
+    } catch (error) {
+      console.error("Payment initiation error:", error);
+      res.status(500).json({
+        error: "Payment initiation failed"
+      });
+    }
+  });
+
+  // Payment initiation - generates UUID and stores in database (legacy endpoint)
   app.post("/api/payments/initiate", async (req, res) => {
     try {
       const { type, amount, currency, relatedEntityId, relatedEntityType } = req.body;
@@ -307,6 +336,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Payment initiation error:", error);
       res.status(500).json({
         error: "Payment initiation failed"
+      });
+    }
+  });
+
+  // Payment confirmation - official MiniKit pattern endpoint
+  app.post("/api/confirm-payment", async (req, res) => {
+    try {
+      const finalPayload = req.body;
+      
+      console.log("[Payment] Confirming payment with payload:", JSON.stringify(finalPayload, null, 2));
+      
+      // Extract payment reference - handle both MiniKit format and test format
+      const paymentRef = finalPayload.reference || finalPayload.id || finalPayload.paymentId;
+      
+      if (!paymentRef) {
+        console.log("[Payment] No payment reference found in payload");
+        return res.status(400).json({
+          success: false,
+          message: "Missing payment reference (reference, id, or paymentId required)"
+        });
+      }
+
+      // Find and update the payment by reference ID
+      console.log("[Payment] Looking up payment with reference:", paymentRef);
+      const paymentRecord = await storage.getPaymentByPaymentId(paymentRef);
+      
+      if (!paymentRecord) {
+        console.log("[Payment] Payment record not found for reference:", paymentRef);
+        
+        // Debug: List all payments to help diagnose
+        const allPayments = await storage.getUserPayments(DEMO_USER_ID);
+        console.log("[Payment] Available payments for user:", allPayments.map(p => ({ id: p.id, paymentId: p.paymentId, status: p.status })));
+        
+        return res.status(404).json({
+          success: false,
+          message: "Payment record not found",
+          debug: {
+            searchedFor: paymentRef,
+            availablePayments: allPayments.map(p => ({ id: p.id, paymentId: p.paymentId, status: p.status }))
+          }
+        });
+      }
+
+      console.log("[Payment] Found payment record:", { id: paymentRecord.id, paymentId: paymentRecord.paymentId, status: paymentRecord.status });
+
+      // Update payment status to completed
+      const updatedPayment = await storage.updatePayment(paymentRecord.id, {
+        status: "completed"
+      });
+
+      // Log successful payment activity
+      await storage.createActivity({
+        userId: DEMO_USER_ID,
+        type: "premium_payment",
+        description: `Payment completed: ${paymentRecord.amount} ${paymentRecord.currency} (${paymentRef})`,
+        amount: paymentRecord.amount,
+      });
+
+      console.log(`[Payment] Confirmed payment ${paymentRef} successfully`);
+
+      res.json({
+        success: true,
+        message: "Payment confirmed successfully",
+        payment: updatedPayment,
+        transaction: finalPayload
+      });
+    } catch (error) {
+      console.error("Payment confirmation error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Payment confirmation failed"
       });
     }
   });
