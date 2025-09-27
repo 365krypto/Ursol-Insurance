@@ -185,6 +185,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const loan = await storage.createLoan(validatedData);
 
+      // Update user balance - add the loan amount to user's URSOL balance
+      const user = await storage.getUser(DEMO_USER_ID);
+      if (user) {
+        const newBalance = parseFloat(user.ursolBalance || "0") + parseFloat(validatedData.amount);
+        await storage.updateUser(DEMO_USER_ID, {
+          ursolBalance: newBalance.toFixed(2)
+        });
+      }
+
       // Create activity
       await storage.createActivity({
         userId: DEMO_USER_ID,
