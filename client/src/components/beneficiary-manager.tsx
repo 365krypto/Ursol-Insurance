@@ -15,6 +15,7 @@ export function BeneficiaryManager() {
   const [beneficiaryData, setBeneficiaryData] = useState<BeneficiaryData>(
     encryption.generateDefaultBeneficiaryData()
   );
+  const [showSecondaryBeneficiary, setShowSecondaryBeneficiary] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -26,7 +27,13 @@ export function BeneficiaryManager() {
     if (beneficiaries && (beneficiaries as any).length > 0) {
       const latest = (beneficiaries as any)[0];
       encryption.decryptBeneficiaryData(JSON.parse(latest.encryptedData))
-        .then(decrypted => setBeneficiaryData(decrypted))
+        .then(decrypted => {
+          setBeneficiaryData(decrypted);
+          // Show secondary beneficiary form if there are existing secondary beneficiaries
+          if (decrypted.secondaryBeneficiaries && decrypted.secondaryBeneficiaries.length > 0) {
+            setShowSecondaryBeneficiary(true);
+          }
+        })
         .catch(console.error);
     }
   }, [beneficiaries]);
@@ -80,6 +87,30 @@ export function BeneficiaryManager() {
         [field]: value,
       },
     }));
+  };
+
+  const updateSecondaryBeneficiary = (field: string, value: any) => {
+    setBeneficiaryData(prev => ({
+      ...prev,
+      secondaryBeneficiaries: (prev.secondaryBeneficiaries || []).map((ben, index) => 
+        index === 0 ? { ...ben, [field]: value } : ben
+      ),
+    }));
+  };
+
+  const addSecondaryBeneficiary = () => {
+    setShowSecondaryBeneficiary(true);
+    if (!beneficiaryData.secondaryBeneficiaries || beneficiaryData.secondaryBeneficiaries.length === 0) {
+      setBeneficiaryData(prev => ({
+        ...prev,
+        secondaryBeneficiaries: [{
+          name: '',
+          relationship: '',
+          allocation: 0,
+          contact: '',
+        }],
+      }));
+    }
   };
 
   return (
@@ -151,12 +182,99 @@ export function BeneficiaryManager() {
               />
             </div>
 
-            <Button 
-              className="w-full bg-green-600 hover:bg-green-600/90 text-white"
-              data-testid="button-add-secondary-beneficiary"
-            >
-              Add Secondary Beneficiary
-            </Button>
+            {!showSecondaryBeneficiary && (
+              <Button 
+                className="w-full bg-green-600 hover:bg-green-600/90 text-white"
+                onClick={addSecondaryBeneficiary}
+                data-testid="button-add-secondary-beneficiary"
+              >
+                Add Secondary Beneficiary
+              </Button>
+            )}
+
+            {showSecondaryBeneficiary && (
+              <div className="space-y-4 border-t pt-4 mt-4">
+                <h4 className="font-medium text-green-400">Secondary Beneficiary</h4>
+                
+                <div>
+                  <Label htmlFor="secondaryName" className="block text-sm font-medium mb-2">
+                    Name
+                  </Label>
+                  <Input
+                    id="secondaryName"
+                    placeholder="Full Name"
+                    value={beneficiaryData.secondaryBeneficiaries?.[0]?.name || ''}
+                    onChange={(e) => updateSecondaryBeneficiary('name', e.target.value)}
+                    data-testid="input-secondary-beneficiary-name"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="secondaryRelationship" className="block text-sm font-medium mb-2">
+                    Relationship
+                  </Label>
+                  <Select
+                    value={beneficiaryData.secondaryBeneficiaries?.[0]?.relationship || ''}
+                    onValueChange={(value) => updateSecondaryBeneficiary('relationship', value)}
+                  >
+                    <SelectTrigger data-testid="select-secondary-relationship">
+                      <SelectValue placeholder="Select relationship" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="spouse">Spouse</SelectItem>
+                      <SelectItem value="child">Child</SelectItem>
+                      <SelectItem value="parent">Parent</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="secondaryAllocation" className="block text-sm font-medium mb-2">
+                    Allocation Percentage
+                  </Label>
+                  <Input
+                    id="secondaryAllocation"
+                    type="number"
+                    placeholder="0"
+                    value={beneficiaryData.secondaryBeneficiaries?.[0]?.allocation || 0}
+                    onChange={(e) => updateSecondaryBeneficiary('allocation', parseInt(e.target.value) || 0)}
+                    data-testid="input-secondary-allocation-percentage"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="secondaryContact" className="block text-sm font-medium mb-2">
+                    Contact Information
+                  </Label>
+                  <Textarea
+                    id="secondaryContact"
+                    placeholder="Address, phone, email..."
+                    rows={3}
+                    value={beneficiaryData.secondaryBeneficiaries?.[0]?.contact || ''}
+                    onChange={(e) => updateSecondaryBeneficiary('contact', e.target.value)}
+                    className="resize-none"
+                    data-testid="textarea-secondary-contact-info"
+                  />
+                </div>
+
+                <Button 
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setShowSecondaryBeneficiary(false);
+                    // Clear secondary beneficiary data when removing
+                    setBeneficiaryData(prev => ({
+                      ...prev,
+                      secondaryBeneficiaries: undefined,
+                    }));
+                  }}
+                  data-testid="button-remove-secondary-beneficiary"
+                >
+                  Remove Secondary Beneficiary
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
