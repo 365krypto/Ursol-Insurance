@@ -53,6 +53,7 @@ export function Navigation() {
     { href: "/staking", label: "Staking" },
     { href: "/borrowing", label: "Borrowing" },
     { href: "/claims", label: "Claims" },
+    { href: "/beneficiaries", label: "Beneficiaries" },
   ];
 
   return (
