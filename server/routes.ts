@@ -135,6 +135,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amount: validatedData.amount,
       });
 
+      // Update user balance - deduct staked amount
+      const user = await storage.getUser(DEMO_USER_ID);
+      if (user) {
+        const newBalance = Math.max(0, parseFloat(user.ursolBalance || "0") - parseFloat(validatedData.amount));
+        await storage.updateUser(DEMO_USER_ID, {
+          ursolBalance: newBalance.toFixed(2)
+        });
+      }
+
       res.json(position);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
