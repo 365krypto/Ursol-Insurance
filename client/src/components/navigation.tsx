@@ -150,6 +150,35 @@ export function Navigation() {
                   {item.label}
                 </Link>
               ))}
+              
+              {/* Connect Wallet button for mobile */}
+              <Button 
+                className="mt-4 w-full justify-start" 
+                onClick={() => {
+                  handleWalletConnect();
+                  setIsMobileMenuOpen(false);
+                }}
+                disabled={isConnecting}
+                variant={isConnected ? "secondary" : "default"}
+                data-testid="button-mobile-connect-wallet"
+              >
+                {isConnecting ? (
+                  <>
+                    <Wallet className="w-4 h-4 mr-2 animate-spin" />
+                    Connecting...
+                  </>
+                ) : isConnected ? (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    Connected
+                  </>
+                ) : (
+                  <>
+                    <Wallet className="w-4 h-4 mr-2" />
+                    Connect Wallet
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         )}
