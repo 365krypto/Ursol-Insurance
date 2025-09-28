@@ -72,7 +72,7 @@ export class MemStorage implements IStorage {
     const demoUser: User = {
       id: "demo-user-1",
       address: "0x742d35cc6639c0532fea175b7b6c7b50f5f3a8f8",
-      ursolBalance: "1247.82",
+      ursolBalance: "15750.00",
       isWorldIdVerified: true,
       createdAt: new Date(),
     };
