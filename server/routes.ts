@@ -117,6 +117,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: DEMO_USER_ID,
       });
 
+      // Server-side validation: ensure amount is greater than 0
+      const amount = parseFloat(validatedData.amount);
+      if (isNaN(amount) || amount <= 0) {
+        return res.status(400).json({ 
+          message: "Amount must be greater than 0" 
+        });
+      }
+
       const position = await storage.createStakingPosition(validatedData);
 
       // Create activity

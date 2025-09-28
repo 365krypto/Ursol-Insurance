@@ -22,6 +22,12 @@ export function StakingPool({ type, data }: StakingPoolProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Validation helpers
+  const isValidAmount = (amount: string): boolean => {
+    const numAmount = parseFloat(amount);
+    return !isNaN(numAmount) && numAmount > 0;
+  };
+
   const isInsurancePool = type === "insurance_pool";
   
   const config = {
@@ -35,6 +41,11 @@ export function StakingPool({ type, data }: StakingPoolProps) {
 
   const stakeMutation = useMutation({
     mutationFn: async (amount: string) => {
+      // Client-side validation
+      if (!isValidAmount(amount)) {
+        throw new Error("Please enter a valid amount greater than 0");
+      }
+      
       return apiRequest("POST", "/api/staking", {
         type,
         amount,
@@ -182,7 +193,7 @@ export function StakingPool({ type, data }: StakingPoolProps) {
           <Button 
             className={`${config.buttonClass} px-6`}
             onClick={() => stakeMutation.mutate(stakeAmount)}
-            disabled={!stakeAmount || stakeMutation.isPending}
+            disabled={!stakeAmount || !isValidAmount(stakeAmount) || stakeMutation.isPending}
             data-testid={`button-stake-${type}`}
           >
             {stakeMutation.isPending ? "Staking..." : "Stake"}
