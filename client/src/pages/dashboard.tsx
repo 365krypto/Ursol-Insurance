@@ -3,8 +3,11 @@ import { Shield, Coins, Gift, DollarSign, Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Crown } from "lucide-react";
 import { Policy, Activity } from "@shared/schema";
+import { useLocation } from "wouter";
 
 export default function Dashboard() {
+  const [, setLocation] = useLocation();
+  
   const { data: dashboardData } = useQuery({
     queryKey: ["/api/dashboard"],
   });
@@ -149,8 +152,12 @@ export default function Dashboard() {
 
                 {/* Add Policy Button */}
                 <div className="border-2 border-dashed border-border rounded-lg p-4 flex items-center justify-center">
-                  <button className="text-center" data-testid="button-add-new-policy">
-                    <Plus className="text-muted-foreground text-2xl mb-2 mx-auto" />
+                  <button 
+                    className="text-center hover:text-primary transition-colors" 
+                    data-testid="button-add-new-policy"
+                    onClick={() => setLocation("/policies")}
+                  >
+                    <Plus className="text-muted-foreground text-2xl mb-2 mx-auto group-hover:text-primary" />
                     <div className="text-sm text-muted-foreground">Add New Policy</div>
                   </button>
                 </div>
